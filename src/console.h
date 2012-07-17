@@ -25,9 +25,8 @@ void console_draw_vt( struct console * vt ,SDL_Surface * screen);
 void console_notify_keypress(SDL_KeyboardEvent * key);
 
 /**Called by CUSE code, not by UI code*/
-void console_notify_write(struct console * vt, gunichar chars[], glong count);
-void console_attach_reader(struct console * vt , struct io_request * request );
-void console_notify_redraw();
+void console_vt_notify_write(struct console * vt, gunichar chars[], glong count);
+void console_vt_attach_reader(struct console * vt , struct io_request * request );
 
 
 #endif /* CONSOLE_H_ */

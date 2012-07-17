@@ -13,6 +13,11 @@
 
 #define MAX_VT	12
 
+/*
+ * Allow up to 512 keypress be cached befoure client can read
+ */
+#define	MAX_BUFFER	512
+
 
 struct console{
 	gunichar	* screen_buffer_glyph;
@@ -20,8 +25,13 @@ struct console{
 	int		current_pos;
 	gint		char_pixelsize; // char size in pixel, 8x16 font is 16
 
+
 	struct		termios termios;
 
+	GMutex		lock;
+	GQueue readers ;
+
+	guint16	keycode_buffer[MAX_BUFFER];
 };
 
 
@@ -57,19 +67,6 @@ void console_draw_vt( struct console * vt ,SDL_Surface * screen )
 			SDL_FreeSurface(source);
 		}
 		i += g_unichar_iswide(vt->screen_buffer_glyph[i]);
-	}
-}
-
-/*
- * allocate VTs
- */
-static void console_allocate()
-{
-	for(int i=0;i<MAX_VT;i++)
-	{
-		vts[i].screen_buffer_glyph = g_new0(gunichar,screen_width*screen_rows);
-		vts[i].screen_buffer_color = g_new0(guint32,screen_width*screen_rows);
-		vts[i].char_pixelsize = 16;
 	}
 }
 
@@ -124,7 +121,14 @@ void init_console(int width,int height,int char_widh_pixel)
 	screen_width = width / (char_widh_pixel /2) ;
 	screen_rows = height/char_widh_pixel;
 
-	console_allocate();
+	for(int i=0;i<MAX_VT;i++)
+	{
+		vts[i].screen_buffer_glyph = g_new0(gunichar,screen_width*screen_rows);
+		vts[i].screen_buffer_color = g_new0(guint32,screen_width*screen_rows);
+		vts[i].char_pixelsize = char_widh_pixel;
+
+		g_queue_init(&vts[i].readers);
+	}
 }
 
 
@@ -141,26 +145,20 @@ struct console * console_direct_get_vt(int index)
 }
 
 
-void	console_notify_write(struct console * vt,gunichar chars[],glong count)
+void console_vt_attach_reader(struct console * vt , struct io_request * request ) //
 {
-	screen_write(vt,chars,count);
-	if(vt == console_get_forground_vt()){
-		utty_force_expose();
-	}
+	g_mutex_lock(&vt->lock);
+
+	g_queue_push_tail(&vt->readers,request);
+
+	g_mutex_unlock(&vt->lock);
 }
 
-void	console_notify_keypress(SDL_KeyboardEvent * key)
+
+void	console_vt_notify_write(struct console * vt,gunichar chars[],glong count)
 {
-	glong written;
-	glong readed;
+	g_mutex_lock(&vt->lock);
 
-	struct console * vt = console_get_forground_vt();
-
-	gunichar * chars = g_utf16_to_ucs4(&key->keysym.unicode,1,&readed,&written,0);
-
-	console_notify_write(vt,chars,written);
-
-	g_free(chars);
 
 
 #if 0
@@ -185,10 +183,30 @@ void	console_notify_keypress(SDL_KeyboardEvent * key)
 	g_free(keystok);
 	g_free(request);
 #endif
+
+
+	screen_write(vt,chars,count);
+
+
+
+	g_mutex_unlock(&vt->lock);
+	if(vt == console_get_forground_vt()){
+		utty_force_expose();
+	}
 }
 
 
-void console_attach_reader(struct console * vt , struct io_request * request ) //
-{
 
+void	console_notify_keypress(SDL_KeyboardEvent * key)
+{
+	glong written;
+	glong readed;
+
+	struct console * vt = console_get_forground_vt();
+
+	gunichar * chars = g_utf16_to_ucs4(&key->keysym.unicode,1,&readed,&written,0);
+
+	console_vt_notify_write(vt,chars,written);
+
+	g_free(chars);
 }

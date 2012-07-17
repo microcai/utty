@@ -29,7 +29,6 @@ static void tty_init(void *userdata)
 {
 	struct fuse_context * context = fuse_get_context();
 	context->private_data = userdata;
-
 }
 
 static void tty_open(fuse_req_t req, struct fuse_file_info *fi)
@@ -56,7 +55,7 @@ static void tty_read(fuse_req_t req, size_t size, off_t off,
 	request->size = size;
 
 	// attach to the readclient line
-	console_attach_reader((struct console *)(fi->fh),request);
+	console_vt_attach_reader((struct console *)(fi->fh),request);
 }
 
 
@@ -67,14 +66,12 @@ static void tty_write(fuse_req_t req, const char *buf, size_t size,
 
 	fuse_reply_write(req,size);
 
-	printf("we got %s",buf);
-
 	// convert to ucs char
 
 	gunichar * chars = g_utf8_to_ucs4_fast(buf,size,&written);
 
 	// put it on-screen buffer
-	console_notify_write((struct console*)fi->fh, chars,written);
+	console_vt_notify_write((struct console*)fi->fh, chars,written);
 }
 
 
