@@ -13,6 +13,18 @@
 
 #define MAX_VT	12
 
+
+struct console{
+	gunichar	* screen_buffer_glyph;
+	guint32	* screen_buffer_color;
+	int		current_pos;
+	gint		char_pixelsize; // char size in pixel, 8x16 font is 16
+
+	struct		termios termios;
+
+};
+
+
 static int fg_vt;
 
 
@@ -31,18 +43,21 @@ void console_draw_vt( struct console * vt ,SDL_Surface * screen )
 
 		SDL_FillRect(screen,0,0);
 
-		for(i=0;i < screen_width*screen_rows ; i++ )
+	for (i = 0; i < screen_width * screen_rows; i++)
+	{
+		if (g_unichar_isprint(vt->screen_buffer_glyph[i]))
 		{
-			pos.x = (i % screen_width) * vt->char_pixelsize /2;
-			pos.y = (i / screen_width) * vt->char_pixelsize  ;
+			pos.x = (i % screen_width) * vt->char_pixelsize / 2;
+			pos.y = (i / screen_width) * vt->char_pixelsize;
 
-			SDL_Surface * source = font_render_unicode(vt->screen_buffer_glyph[i],vt->char_pixelsize);
+			SDL_Surface * source = font_render_unicode(
+					vt->screen_buffer_glyph[i], vt->char_pixelsize);
 
-			SDL_BlitSurface(source,0,screen,&pos);
-
+			SDL_BlitSurface(source, 0, screen, &pos);
 			SDL_FreeSurface(source);
-			i+=g_unichar_iswide(vt->screen_buffer_glyph[i]);
 		}
+		i += g_unichar_iswide(vt->screen_buffer_glyph[i]);
+	}
 }
 
 /*

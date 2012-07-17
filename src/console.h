@@ -8,20 +8,17 @@
 #ifndef CONSOLE_H_
 #define CONSOLE_H_
 
+#include <termios.h>
 #include <glib.h>
 #include <SDL/SDL_events.h>
-#include "utty.h"
 
-struct console{
-	gunichar	* screen_buffer_glyph;
-	guint32	* screen_buffer_color;
-	int		current_pos;
-	gint		char_pixelsize; // char size in pixel, 8x16 font is 16
-};
+struct console;
 
 void init_console(int width,int height, int char_widh_pixel);
 struct console * console_direct_get_vt(int index);
 struct console  * console_get_forground_vt();
+void	 console_vt_get_termios(struct console * vt,struct termios *);
+void	 console_vt_set_termios(struct console * vt,struct termios *);
 
 /*Called by UI code, not by CUSE code*/
 void console_draw_vt( struct console * vt ,SDL_Surface * screen);
