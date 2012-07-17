@@ -101,7 +101,7 @@ struct fuse_session * device_init(int vt_index)
 	ci.flags = CUSE_UNRESTRICTED_IOCTL;
 
 	fuse_opt_add_arg(&args, "utty");
-	fuse_opt_add_arg(&args, "-d");
+	fuse_opt_add_arg(&args, "-f");
 
 
 

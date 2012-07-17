@@ -15,6 +15,22 @@
 #include "utty.h"
 
 
+const char * cmdname( int cmd)
+{
+	switch (cmd) {
+		case TCGETS:
+			return "TCGETS";
+			break;
+		case TCSETSW:
+			return "TCSETSW";
+		default:
+			break;
+	}
+
+	return "unknow";
+}
+
+
 void tty_ioctl(fuse_req_t req, int cmd, void *arg,
 			  struct fuse_file_info *fi, unsigned flags,
 			  const void *in_buf, size_t in_bufsz, size_t out_bufsz)
@@ -27,15 +43,17 @@ void tty_ioctl(fuse_req_t req, int cmd, void *arg,
 		return;
 	}
 
-	struct iovec in,out;
-
-	in.iov_base = &termios;
-	in.iov_len  = sizeof(termios);
-	out.iov_base = &termios;
-	out.iov_len  = sizeof(termios);
+	printf("handled cmd=0x%x (%s) . arg=%p\n",cmd, cmdname(cmd) , arg);
 
 
 	switch(cmd){
+	/*noop ioctls be here*/
+	case TCFLSH:
+	case TCXONC:
+	case TCSBRK:
+		fuse_reply_ioctl(req, 0, 0,0);
+		break;
+
 	case TCSBRK:
 		fuse_reply_err(req, EINVAL);
 		break;
@@ -109,9 +127,6 @@ void tty_ioctl(fuse_req_t req, int cmd, void *arg,
 	}
 	break;
 
-	case TIOCMGET:
-		fuse_reply_err(req,EINVAL);
-		break;
 
 	case KDGKBMODE: // kernel keyborad mode
 		if (!out_bufsz)
@@ -126,14 +141,14 @@ void tty_ioctl(fuse_req_t req, int cmd, void *arg,
 			fuse_reply_ioctl(req, 0, &mode, sizeof(unsigned int));
 		}
 		break;
-	case TCFLSH:
-		fuse_reply_ioctl(req, 0, 0,0);
+
+
+	case TIOCMGET:
+		fuse_reply_err(req,EINVAL);
 		break;
+
 	default:
 		fuse_reply_err(req,ENOSYS);
-
-//		fuse_reply_ioctl(req,EPERM,0,0);
 		return ;
 	}
-	printf("handled cmd=%d . arg=%p\n",cmd,arg);
 }
