@@ -2,7 +2,22 @@
 #ifndef UTTY_H_
 #define UTTY_H_
 
-void tty_ioctl(fuse_req_t req, int cmd, void *arg, struct fuse_file_info *fi,
-		unsigned flags, const void *in_buf, size_t in_bufsz, size_t out_bufsz);
+#include <fuse/fuse_lowlevel.h>
+
+
+/* Struct to process the read request or poll*/
+struct io_request
+{
+	fuse_req_t req;
+	size_t size;
+	off_t off;
+	struct fuse_file_info *fi;
+
+	int		revent;
+
+};
+
+void utty_force_expose();
+
 
 #endif /* UTTY_H_ */
