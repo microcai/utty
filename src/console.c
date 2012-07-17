@@ -5,19 +5,14 @@
  * Mainly the code to manipulate framebuffer and deal with keyborad with SDL
  */
 
-
+#include <termio.h>
 #include <SDL/SDL.h>
 #include "utty.h"
 #include "font.h"
 #include "console.h"
+#include "vt.h"
 
 #define MAX_VT	12
-
-/*
- * Allow up to 512 keypress be cached befoure client can read
- */
-#define	MAX_BUFFER	512
-
 
 struct console{
 	gunichar	* screen_buffer_glyph;
@@ -28,10 +23,10 @@ struct console{
 
 	struct		termios termios;
 
-	GMutex		lock;
+	GRecMutex		lock;
 	GQueue readers ;
 
-	guint16	keycode_buffer[MAX_BUFFER];
+	GQueue	keycode_buffer;
 };
 
 
@@ -107,6 +102,13 @@ static void screen_write(struct console * vt,gunichar * chars, glong written)
 		case '\n':
 			screen_nextline(vt);
 			continue;
+		case	'\r':
+			screen_nextline(vt);
+			continue;
+		case '\b':
+			if (vt->current_pos > 0)
+				vt->screen_buffer_glyph[--vt->current_pos] = 0;
+			continue;
 		}
 
 		screen_write_char(vt,chars[i]);
@@ -115,6 +117,11 @@ static void screen_write(struct console * vt,gunichar * chars, glong written)
 	}
 }
 
+static void init_default_termios(struct termios * tp)
+{
+	ioctl(0,TCGETS,tp);
+	tp->c_lflag |= ECHOCTL|ECHO;
+}
 
 void init_console(int width,int height,int char_widh_pixel)
 {
@@ -128,6 +135,10 @@ void init_console(int width,int height,int char_widh_pixel)
 		vts[i].char_pixelsize = char_widh_pixel;
 
 		g_queue_init(&vts[i].readers);
+		g_queue_init(&vts[i].keycode_buffer);
+
+		init_default_termios(&vts[i].termios);
+
 	}
 }
 
@@ -147,66 +158,128 @@ struct console * console_direct_get_vt(int index)
 
 void console_vt_attach_reader(struct console * vt , struct io_request * request ) //
 {
-	g_mutex_lock(&vt->lock);
+	g_rec_mutex_lock(&vt->lock);
 
 	g_queue_push_tail(&vt->readers,request);
 
-	g_mutex_unlock(&vt->lock);
+	g_rec_mutex_unlock(&vt->lock);
 }
 
 
 void	console_vt_notify_write(struct console * vt,gunichar chars[],glong count)
 {
-	g_mutex_lock(&vt->lock);
-
-
-
-#if 0
-	struct io_request * request = g_queue_pop_head(&readers);
-
-	if(!request)
-	{
-		return ;
-	}
-
-	glong written;
-	glong readed;
-
-
-	char * keystok = g_utf16_to_utf8(&event->key.keysym.unicode,1,&readed,&written,0);
-
-	if(request->size < written){
-		fuse_reply_err(request->req,EAGAIN);
-	}else{
-		fuse_reply_buf(request->req,keystok,written);
-	}
-	g_free(keystok);
-	g_free(request);
-#endif
-
+	g_rec_mutex_lock(&vt->lock);
 
 	screen_write(vt,chars,count);
 
+	g_rec_mutex_unlock(&vt->lock);
 
-
-	g_mutex_unlock(&vt->lock);
 	if(vt == console_get_forground_vt()){
 		utty_force_expose();
 	}
 }
 
+void	console_vt_notify_keypress(struct console * vt,SDL_KeyboardEvent * key)
+//;; gunichar chars[],glong count)
+{
+	gunichar keycode = key->keysym.unicode;
+
+	g_rec_mutex_lock(&vt->lock);
+
+
+	struct io_request * request = g_queue_peek_head(&vt->readers);
+
+	cc_t lflag = vt->termios.c_lflag;
+
+	int should_notify = 0;
+	int should_queue = 1;
+
+	if( ! (lflag & ICANON)  ) // not line buffered
+	{
+		should_notify = 1;
+	}
+
+	if( (lflag & ICANON) && (keycode == '\r') ) // line buffered and enter pressed
+	{
+		should_notify = 1;
+	}
+
+	// enough to feed the read buffer
+	if( !should_notify && request )
+		if( request->size <= (g_queue_get_length(&vt->keycode_buffer) +1) )
+			should_notify = 1;
+
+	if(keycode == '\r')
+		keycode = vt->termios.c_iflag & ICRNL ? '\n':'\r';
+
+	if( keycode == '\b' && (lflag & ICANON) ) // line edit, erase one
+	{
+		g_queue_pop_tail(& vt->keycode_buffer);
+
+		should_queue = 0;
+	}
+
+	// is line buffered ?
+	if( lflag & ECHO ){ // echo
+
+		// write to screen buffer
+		console_vt_notify_write(vt,&keycode,1);
+
+	}
+
+
+	if(should_notify)
+	{
+		should_queue = 0;
+		// notify the reader
+		request = g_queue_pop_head(&vt->readers);
+
+		if(request)
+		{
+			glong		written;
+			gchar *   for_client;
+
+			glong		len = g_queue_get_length(&vt->keycode_buffer) +1;
+			//  line up keycodes
+			gunichar * keycodes = g_new0( gunichar, len);
+			gunichar * _keycodes = keycodes;
+
+			void g_cb_lineup(gpointer data, gpointer user_data)
+			{
+				gunichar ** pkeycodes = user_data;
+				gunichar * keycodes = *pkeycodes;
+
+				*keycodes = GPOINTER_TO_UINT(data);
+
+				pkeycodes[0]++;
+			}
+
+			g_queue_foreach(&vt->keycode_buffer,g_cb_lineup,&_keycodes);
+
+			*_keycodes = keycode ;//
+
+			for_client = g_ucs4_to_utf8(keycodes,len,NULL,&written,NULL);
+
+			g_free(keycodes);
+
+			// to see if it realy feed your stomach
+			tty_notify_read(request,for_client,written);
+
+			g_free(for_client);
+			g_free(request);
+		}
+		g_queue_clear(&vt->keycode_buffer);
+	}
+
+	if(should_queue)
+		g_queue_push_tail(&vt->keycode_buffer, GUINT_TO_POINTER(key->keysym.unicode));
+
+	g_rec_mutex_unlock(&vt->lock);
+}
 
 
 void	console_notify_keypress(SDL_KeyboardEvent * key)
 {
-	glong written;
-	glong readed;
-
 	struct console * vt = console_get_forground_vt();
-
-	gunichar * chars = g_utf16_to_ucs4(&key->keysym.unicode,1,&readed,&written,0);
-
-	console_vt_notify_write(vt,chars,written);
-
-	g_free(chars);
+	console_vt_notify_keypress(vt,key);
 }

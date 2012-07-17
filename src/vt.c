@@ -16,7 +16,6 @@
 #include "vt.h"
 
 
-
 static void tty_poll(fuse_req_t req, struct fuse_file_info *fi,struct fuse_pollhandle *ph)
 {
 //	sleep(1);
@@ -40,6 +39,10 @@ static void tty_open(fuse_req_t req, struct fuse_file_info *fi)
 	fuse_reply_open(req, fi);
 }
 
+void tty_notify_read(struct io_request * req,gchar * buffer,glong count)
+{
+	fuse_reply_buf(req->req,buffer,count);
+}
 
 static void tty_read(fuse_req_t req, size_t size, off_t off,
 			 struct fuse_file_info *fi)
