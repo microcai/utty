@@ -1,0 +1,17 @@
+*.o
+*~
+.*
+!.gitignore
+
+
+Makefile
+Makefile.in
+config.*
+m4/
+*m4
+autom*/
+configure
+missing
+install-sh
+depcomp
+
