@@ -1,5 +1,5 @@
 bin_PROGRAMS=utty
-utty_SOURCES=cusetty.c
+utty_SOURCES=cusetty.c ioctl.c utty.h kernel.h 
 
 AM_CPPFLAGS=@FUSE_CFLAGS@ @GLIB_CFLAGS@ @FONTS_CFLAGS@
 

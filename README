@@ -1,1 +1,16 @@
-Sample readme file for cusetty project.
+Linux 内核本身的 TTY 控制台代码十分的 bugy,  当然，能工作而已。
+不过，最关键的问题是不支持 国际化。 不支持矢量字体，事实上在我打补丁前，都不能显示 CJK 字符。
+TTY 暴露给用户空间的接口事实上也就是 /dev/ttyXX 字符设备。 XX 从 0 到 63
+
+如果能在用户空间实现了 tty 设备，然后由用户空间的程序绘制图形到 /dev/fb0 不也就实现了控制台了么？！而且是 user mode 的！
+意味着我们可以用 FreeType2 使用矢量字体，甚至可以用 Pango 进行多国语言的排版！
+但是要如何实现在用户空间这边搞 tty设备呢？ tty 设备虽然最大的用处类似 pipe , 在显示设备和cli 程序的 stdout 直接建立连接，但是包行了一系列的 ioctl 来实现各种特殊功能包括 ncurses 。这就不是 pipe 能实现的。如果简单的用  /dev/pts/ 来模拟，也会有问题。 pts 和 tty 之间还是有许多不相同的地方，而且如果要在 pts 实现，那做这个 pts master 的进程就只能是 pid 1 了，因为 agettty 就是 pid 1 fork  出来的。pts 只能父子继承。
+所以得寻求替代方案，幸运的是，我们有 CUSE. 由 FUSE 提供的另一种强大功能。CUSE 能在  user space 实现一切字符设备的操作功能，于是我提出实现一个 Userspace TTY Daemon， aka uttyd .
+uttyd 启动的时候将原有的 /dev/tty* 全部删除，然后自己建立新的 /dev/ttyXX 节点，当然  uttyd  要在 agetty 之前启动。
+然后后续运行 agetty 的时候利用的 tty 就是 uttyd 实现的了。
+uttyd 在内部实现了一个支持 UTF-8 的 VT100 兼容控制台，利用 SDL 在framebuffer 上直接绘图。
+ 
+为何用 SDL 呢？ SDL 足够轻量，而且可以在 X 环境下调试，如果是在 framebuffer 下，自动的使用 /dev/fb0 而不需要修改程序。
+uttyd 利用 fontconfig 进行字体配置，并使用 FreeType2 进行渲染，最后用 SDL 绘制到屏幕上。
+只要你系统里安装了中文字体，你就能实现中文控制台。
+
