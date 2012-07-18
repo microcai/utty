@@ -64,8 +64,31 @@ static void utty_run()
 	}
 }
 
-static void utty_init_video()
+
+
+static void utty_init_video(int argc, char **argv)
 {
+	gint fontsize= 16;
+
+	GOptionEntry en[]={
+			{
+			.long_name = "fontsize",
+			.short_name = 's',
+			.flags = G_OPTION_FLAG_IN_MAIN,
+			.arg = G_OPTION_ARG_INT,
+			.arg_data = &fontsize,
+
+			.description = "Font size, in pixels",
+			},NULL,
+	};
+
+	GOptionContext * gc =  g_option_context_new("utty");
+	g_option_context_set_help_enabled(gc,1);
+	g_option_context_add_main_entries(gc,en,"utty");
+	g_option_context_parse(gc,&argc,&argv,0);
+
+
+
 	SDL_Surface * screen;
 
 	setenv("SDL_VIDEO_CENTERED","1",1);
@@ -103,9 +126,9 @@ static void utty_init_video()
 
 		screen = SDL_SetVideoMode(m->w, m->h, 32 , SDL_SWSURFACE);
 
-		init_console(m->w,m->h,16);
+		init_console(m->w,m->h,fontsize);
 
-		printf("pixels: %dx%d , text  %dx%d\n",m->w,m->h,m->w/8,m->h/16);
+		printf("pixels: %dx%d , text  %dx%d\n",m->w,m->h,m->w/(fontsize/2),m->h/fontsize);
 
 	}
 	else if(!modes)
@@ -116,9 +139,9 @@ static void utty_init_video()
 	{
 		screen = SDL_SetVideoMode(800, 600, 32, SDL_SWSURFACE);
 
-		init_console(800, 600,16);
+		init_console(800, 600,fontsize);
 
-		printf("any, so i set %dx%d  aka text mode  %dx%d\n\n",800, 600,800/8,600/16);
+		printf("any, so i set %dx%d  aka text mode  %dx%d\n\n",800, 600,800/(fontsize/2),600/fontsize);
 	}
 
 	SDL_Surface * bmp = SDL_LoadBMP("test.bmp");
@@ -129,20 +152,20 @@ static void utty_init_video()
 
 }
 
-static void utty_init()
+static void utty_init(int argc, char **argv)
 {
 	/*
 	 * init display and keyborad.
 	 *
 	 * It will then call init_console() to build an console on top of it and mutiplex it as VT
 	 */
-	utty_init_video();
+	utty_init_video(argc,argv);
 
 	// load font
-	init_font();
+	init_font(argc,argv);
 
 	//  create tty device , one thread per tty
-	init_vt();
+	init_vt(argc,argv);
 }
 
 void utty_force_expose()
@@ -157,7 +180,7 @@ void utty_force_expose()
 int main(int argc, char **argv)
 {
 	// init things
-	utty_init();
+	utty_init(argc,argv);
 	// UI thread main loop
 	utty_run();
 	return 0;

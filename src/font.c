@@ -14,7 +14,7 @@
 static int sdldeeps[] =
 { 32, 1, 8, 2, 4, 8, 8 };
 
-void init_font()
+void init_font(int argc, char **argv)
 {
 	glong width,height;
 

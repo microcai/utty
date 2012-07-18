@@ -122,7 +122,7 @@ int cuse_loop( void * threadparam)
 }
 
 
-void init_vt()
+void init_vt(int argc, char **argv)
 {
 	SDL_CreateThread(cuse_loop, device_init(0));
 }
