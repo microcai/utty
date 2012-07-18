@@ -1,0 +1,21 @@
+Short Term: Things *must* be implemented, orded
+
+Complete TTY set of IOCTLs support, so top can work
+
+Complete keyborad support, like CTRL-C send SIGTERM, so can do real work
+
+VT MASTER support, co-exist with X (will be removed then X dead)
+
+Color Support, be more friendly
+
+Mouse Support, emulate gpm interface. no gpm daemon need to be started
+
+
+Long term:
+
+Right to left reading support
+
+Client as a System compositor
+
+
+
