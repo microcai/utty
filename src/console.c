@@ -90,7 +90,9 @@ static void screen_write_char(struct console * vt,gunichar  c)
 {
 	// decode ESC escape sequence here
 
-	if(vt->flags_esc ){
+	if(c<8)return;
+
+	if(vt->flags_esc ==1 ){
 		if(c=='['){
 			vt->flags_csi = 1;
 			vt->flags_esc = 0;
@@ -98,7 +100,7 @@ static void screen_write_char(struct console * vt,gunichar  c)
 		}
 	}
 
-	if(vt->flags_csi)
+	if(vt->flags_csi==1)
 	{
 		if(c == 'm')
 		{
@@ -124,9 +126,6 @@ static void screen_write_char(struct console * vt,gunichar  c)
 	{
 		screen_nextline(vt);
 	}
-
-
-
 
 	do
 	{
@@ -196,6 +195,13 @@ struct console * console_direct_get_vt(int index)
 	return NULL;
 }
 
+void console_vt_get_window_size(struct console * vt ,struct winsize * size)
+{
+	size->ws_col = screen_width;
+	size->ws_row = screen_rows;
+	size->ws_xpixel = vt->char_pixelsize/2;
+	size->ws_ypixel = vt->char_pixelsize;
+}
 
 void console_vt_attach_reader(struct console * vt , struct io_request * request ) //
 {
@@ -245,27 +251,26 @@ void	console_vt_notify_keypress(struct console * vt,SDL_KeyboardEvent * key)
 		should_notify = 1;
 	}
 
-	// enough to feed the read buffer
-	if( !should_notify && request )
-		if( request->size <= (g_queue_get_length(&vt->keycode_buffer) +1) )
-			should_notify = 1;
-
 	if(keycode == '\r')
 		keycode = vt->termios.c_iflag & ICRNL ? '\n':'\r';
 
-	if( keycode == '\b' && (lflag & ICANON) ) // line edit, erase one
+	if( keycode == '\b' && (lflag & ICANON|ECHOE) ) // line edit, erase one
 	{
 		g_queue_pop_tail(& vt->keycode_buffer);
 
 		should_queue = 0;
 	}
 
+	// enough to feed the read buffer
+	if( !should_notify && (keycode!='\b' ) && request )
+		if( request->size <= (g_queue_get_length(&vt->keycode_buffer) +1) )
+			should_notify = 1;
+
 	// is line buffered ?
 	if( lflag & ECHO ){ // echo
 		// write to screen buffer
 		console_vt_notify_write(vt,&keycode,1);
 	}
-
 
 	if(should_notify)
 	{
@@ -318,10 +323,23 @@ void	console_vt_notify_keypress(struct console * vt,SDL_KeyboardEvent * key)
 
 void	console_notify_keypress(SDL_KeyboardEvent * key)
 {
+	int notify = 0;
 	struct console * vt = console_get_forground_vt();
-	console_vt_notify_keypress(vt,key);
+
+	switch (key->keysym.sym) {
+		case 8 ... SDLK_DELETE: // ascii keys
+			notify = 1;
+			break;
+		default:
+			break;
+	}
+	if(key->keysym.sym)
+
+	if(notify)
+		console_vt_notify_keypress(vt,key);
 }
 
+#ifdef DEBUG
 
 void DBG_console_vt_printbuffer(struct console * vt)
 {
@@ -350,3 +368,4 @@ void DBG_console_vt_printbuffer(struct console * vt)
 	printf("*************end screen dump****************\n");
 
 }
+#endif

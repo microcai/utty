@@ -139,7 +139,22 @@ void tty_ioctl(fuse_req_t req, int cmd, void *arg,
 			fuse_reply_ioctl(req, 0, &mode, sizeof(unsigned int));
 		}
 		break;
+	case TIOCGWINSZ: // get window size
 
+		if (!out_bufsz)
+		{
+			struct iovec iov =
+			{ arg, sizeof(struct winsize) };
+			fuse_reply_ioctl_retry(req, NULL, 0, &iov, 1);
+		}
+		else
+		{
+			struct winsize size;
+			console_vt_get_window_size(vt,&size);
+			fuse_reply_ioctl(req, 0, &size, sizeof(size));
+		}
+		break;
+	case TIOCSWINSZ:
 	case TIOCMGET:
 		fuse_reply_err(req,EINVAL);
 		break;

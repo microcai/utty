@@ -8,7 +8,7 @@
 #ifndef CONSOLE_H_
 #define CONSOLE_H_
 
-#include <termios.h>
+#include <termio.h>
 #include <glib.h>
 #include <SDL/SDL_events.h>
 
@@ -49,13 +49,17 @@ void	 console_vt_set_termios(struct console * vt,struct termios *);
 /*Called by UI code, not by CUSE code*/
 void console_draw_vt( struct console * vt ,SDL_Surface * screen);
 void console_notify_keypress(SDL_KeyboardEvent * key);
-/*debug only*/
-void DBG_console_vt_printbuffer(struct console * vt);
 
+/*debug only*/
+#ifdef DEBUG
+void DBG_console_vt_printbuffer(struct console * vt);
+#else
+#define DBG_console_vt_printbuffer(x)  do{;}while(0)
+#endif
 
 /**Called by CUSE code, not by UI code*/
 void console_vt_notify_write(struct console * vt, gunichar chars[], glong count);
 void console_vt_attach_reader(struct console * vt , struct io_request * request );
-
+void console_vt_get_window_size(struct console * vt ,struct winsize*);
 
 #endif /* CONSOLE_H_ */
