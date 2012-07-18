@@ -14,20 +14,8 @@
 
 #define MAX_VT	12
 
-struct console{
-	gunichar	* screen_buffer_glyph;
-	guint32	* screen_buffer_color;
-	int		current_pos;
-	gint		char_pixelsize; // char size in pixel, 8x16 font is 16
-
-
-	struct		termios termios;
-
-	GRecMutex		lock;
-	GQueue readers ;
-
-	GQueue	keycode_buffer;
-};
+#define ESC		0x1B
+#define CSI		0x9B
 
 
 static int fg_vt;
@@ -36,17 +24,18 @@ static int fg_vt;
 /* ALL THE VT HAVE THE SAME SCREEN SIZE*/
 int screen_width, screen_rows;
 
-struct console  vts[MAX_VT]={0};
+struct console vts[MAX_VT] =
+{ 0 };
 
-void console_draw_vt( struct console * vt ,SDL_Surface * screen )
+void console_draw_vt(struct console * vt, SDL_Surface * screen)
 {
 	/*
 	 * redraw current screen
 	 */
-		int i;
-		SDL_Rect		pos;
+	int i;
+	SDL_Rect pos;
 
-		SDL_FillRect(screen,0,0);
+	SDL_FillRect(screen, 0, 0);
 
 	for (i = 0; i < screen_width * screen_rows; i++)
 	{
@@ -67,7 +56,7 @@ void console_draw_vt( struct console * vt ,SDL_Surface * screen )
 
 static void screen_wrap(struct console * vt)
 {
-	if(vt->current_pos >= screen_width*screen_rows) // move out of screen, scroll one line
+	if (vt->current_pos >= screen_width*screen_rows) // move out of screen, scroll one line
 	{
 		memmove(vt->screen_buffer_glyph,vt->screen_buffer_glyph + screen_width, screen_width*(screen_rows-1)*sizeof(gunichar));
 		memset(vt->screen_buffer_glyph + screen_width*(screen_rows-1) , 0 ,screen_width*sizeof(gunichar));
@@ -85,12 +74,66 @@ static void screen_nextline(struct console * vt)
 	screen_wrap(vt);
 }
 
+static void screen_startline(struct console * vt)
+{
+	// move to line begin, if possible, scroll the buffer
+	vt->current_pos = ((vt->current_pos / screen_width))* screen_width;
+}
+
+
+static int	screen_can_double(struct console * vt) // enough space to write this double width char this line?
+{
+	return (screen_width - vt->current_pos % screen_width) > 1;
+}
+
 static void screen_write_char(struct console * vt,gunichar  c)
 {
-	vt->screen_buffer_glyph[vt->current_pos] = c;
-	vt->current_pos++;
+	// decode ESC escape sequence here
 
-	screen_wrap(vt);
+	if(vt->flags_esc ){
+		if(c=='['){
+			vt->flags_csi = 1;
+			vt->flags_esc = 0;
+			return ;
+		}
+	}
+
+	if(vt->flags_csi)
+	{
+		if(c == 'm')
+		{
+			vt->flags_csi = 0;
+			return;
+		}
+		return ;
+	}
+
+	switch(c)
+	{
+	case ESC:
+		vt->flags_esc = 1;
+		return ;
+	case CSI:
+		vt->flags_csi = 1;
+		return ;
+	}
+
+	int i = g_unichar_iswide(c);
+
+	if( i && (!screen_can_double(vt)) )
+	{
+		screen_nextline(vt);
+	}
+
+
+
+
+	do
+	{
+		vt->screen_buffer_glyph[vt->current_pos] = c;
+		vt->current_pos++;
+		screen_wrap(vt);
+	} while (i--);
 }
 
 static void screen_write(struct console * vt,gunichar * chars, glong written)
@@ -103,7 +146,7 @@ static void screen_write(struct console * vt,gunichar * chars, glong written)
 			screen_nextline(vt);
 			continue;
 		case	'\r':
-			screen_nextline(vt);
+			screen_startline(vt);
 			continue;
 		case '\b':
 			if (vt->current_pos > 0)
@@ -112,8 +155,6 @@ static void screen_write(struct console * vt,gunichar * chars, glong written)
 		}
 
 		screen_write_char(vt,chars[i]);
-		if(	g_unichar_iswide(chars[i]))
-			screen_write_char(vt,chars[i]);
 	}
 }
 
@@ -221,10 +262,8 @@ void	console_vt_notify_keypress(struct console * vt,SDL_KeyboardEvent * key)
 
 	// is line buffered ?
 	if( lflag & ECHO ){ // echo
-
 		// write to screen buffer
 		console_vt_notify_write(vt,&keycode,1);
-
 	}
 
 
@@ -266,7 +305,6 @@ void	console_vt_notify_keypress(struct console * vt,SDL_KeyboardEvent * key)
 			tty_notify_read(request,for_client,written);
 
 			g_free(for_client);
-			g_free(request);
 		}
 		g_queue_clear(&vt->keycode_buffer);
 	}
@@ -282,4 +320,33 @@ void	console_notify_keypress(SDL_KeyboardEvent * key)
 {
 	struct console * vt = console_get_forground_vt();
 	console_vt_notify_keypress(vt,key);
+}
+
+
+void DBG_console_vt_printbuffer(struct console * vt)
+{
+	int x,y;
+	gunichar code ;
+
+	printf("************begin screen dump***************\n");
+
+
+	// print buffers
+	for (y = 0; y < screen_rows; y++)
+	{
+		for(x=0;x<screen_width;x++)
+		{
+			code = vt->screen_buffer_glyph[y*screen_width + x];
+
+			//print the code
+			printf("0x%04x",code);
+			if(g_unichar_isprint(code))
+				printf("(%c) ",code);
+			else
+				printf("(*) ");
+		}
+		printf("\n",code);
+	}
+	printf("*************end screen dump****************\n");
+
 }

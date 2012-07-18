@@ -24,24 +24,16 @@ static void tty_poll(fuse_req_t req, struct fuse_file_info *fi,struct fuse_pollh
 
 }
 
-static void tty_init(void *userdata)
-{
-	struct fuse_context * context = fuse_get_context();
-	context->private_data = userdata;
-}
-
 static void tty_open(fuse_req_t req, struct fuse_file_info *fi)
 {
-	// attatch to console
-	struct fuse_context * context = fuse_get_context();
-
-	fi->fh = (uint64_t)(context->private_data);
+	fi->fh = (uint64_t)fuse_req_userdata(req);
 	fuse_reply_open(req, fi);
 }
 
 void tty_notify_read(struct io_request * req,gchar * buffer,glong count)
 {
 	fuse_reply_buf(req->req,buffer,count);
+	g_free(req);
 }
 
 static void tty_read(fuse_req_t req, size_t size, off_t off,
@@ -77,13 +69,22 @@ static void tty_write(fuse_req_t req, const char *buf, size_t size,
 	console_vt_notify_write((struct console*)fi->fh, chars,written);
 }
 
+static void tty_release(fuse_req_t req, struct fuse_file_info *fi)
+{
+	struct console * vt = (void*)fi->fh;
+
+	//no more references
+	vt->control_pid = -1 ; //
+
+	fuse_reply_err(req,0);
+}
 
 static const struct cuse_lowlevel_ops tty_clop = {
-	.init_done	= tty_init,
 	.open		= tty_open,
 	.read		= tty_read,
 	.write		= tty_write,
 	.ioctl		= tty_ioctl,
+	.release	= tty_release,
 	.poll		= tty_poll,
 };
 

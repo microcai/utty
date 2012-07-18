@@ -57,6 +57,10 @@ static void utty_run()
 		case SDL_KEYDOWN:
 			// process keyborad event
 			console_notify_keypress(&event.key);
+			break;
+		case SDL_MOUSEBUTTONDOWN:
+			DBG_console_vt_printbuffer(console_get_forground_vt());
+			break;
 		}
 	}
 }
@@ -79,6 +83,7 @@ static void utty_init_video()
 		case SDL_KEYUP:
 		case SDL_QUIT:
 		case SDL_USEREVENT:
+		case SDL_MOUSEBUTTONDOWN:
 			return 1;
 		}
 		return 0;
