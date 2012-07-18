@@ -29,4 +29,6 @@ Also we can debug under X :)
 Sure http://v.youku.com/v_show/id_XNDI5MDIwOTQ4.html
 We chinese people are not allowed to access GOOGLE service. :( . So no youtube video.
 
-
+4: why not cjktty?
+The upstream don't like it. :(
+Some feature so hard to be implemented inside the kernel
