@@ -45,7 +45,7 @@ void console_draw_vt(struct console * vt, SDL_Surface * screen)
 			pos.y = (i / screen_width) * vt->char_pixelsize;
 
 			SDL_Surface * source = font_render_unicode(
-					vt->screen_buffer_glyph[i], vt->char_pixelsize);
+					vt->screen_buffer_glyph[i],vt->char_pixelsize,vt->screen_buffer_attr[i]);
 
 			SDL_BlitSurface(source, 0, screen, &pos);
 			SDL_FreeSurface(source);
@@ -58,9 +58,13 @@ static void screen_wrap(struct console * vt)
 {
 	if (vt->current_pos >= screen_width*screen_rows) // move out of screen, scroll one line
 	{
+		//chars
 		memmove(vt->screen_buffer_glyph,vt->screen_buffer_glyph + screen_width, screen_width*(screen_rows-1)*sizeof(gunichar));
 		memset(vt->screen_buffer_glyph + screen_width*(screen_rows-1) , 0 ,screen_width*sizeof(gunichar));
 
+		//attributes
+		memmove(vt->screen_buffer_attr,vt->screen_buffer_attr + screen_width, screen_width*(screen_rows-1)*sizeof(guint64));
+		memset(vt->screen_buffer_attr + screen_width*(screen_rows-1) , 0 ,screen_width*sizeof(guint64));
 
 		vt->current_pos -= screen_width;
 	}
@@ -130,6 +134,7 @@ static void screen_write_char(struct console * vt,gunichar  c)
 	do
 	{
 		vt->screen_buffer_glyph[vt->current_pos] = c;
+		vt->screen_buffer_attr[vt->current_pos] = vt->cur_attr;
 		vt->current_pos++;
 		screen_wrap(vt);
 	} while (i--);
@@ -148,8 +153,10 @@ static void screen_write(struct console * vt,gunichar * chars, glong written)
 			screen_startline(vt);
 			continue;
 		case '\b':
-			if (vt->current_pos > 0)
+			if (vt->current_pos > 0){
 				vt->screen_buffer_glyph[--vt->current_pos] = 0;
+				vt->screen_buffer_attr[vt->current_pos] = 0;
+			}
 			continue;
 		}
 
@@ -168,10 +175,21 @@ void init_console(int width,int height,int char_widh_pixel)
 	screen_width = width / (char_widh_pixel /2) ;
 	screen_rows = height/char_widh_pixel;
 
+	union attribute attr;
+
+	/*
+	 *  initial color is white
+	 */
+	attr.qword = 0;
+
+	attr.s.fg.red =30;
+	attr.s.fg.green = 255;
+	attr.s.fg.blue = 30;
+
 	for(int i=0;i<MAX_VT;i++)
 	{
 		vts[i].screen_buffer_glyph = g_new0(gunichar,screen_width*screen_rows);
-		vts[i].screen_buffer_color = g_new0(guint32,screen_width*screen_rows);
+		vts[i].screen_buffer_attr = g_new0(guint64,screen_width*screen_rows);
 		vts[i].char_pixelsize = char_widh_pixel;
 
 		g_queue_init(&vts[i].readers);
@@ -179,6 +197,7 @@ void init_console(int width,int height,int char_widh_pixel)
 
 		init_default_termios(&vts[i].termios);
 
+		vts[i].cur_attr = attr.qword;
 	}
 }
 
@@ -202,6 +221,25 @@ void console_vt_get_window_size(struct console * vt ,struct winsize * size)
 	size->ws_xpixel = vt->char_pixelsize/2;
 	size->ws_ypixel = vt->char_pixelsize;
 }
+
+void console_get_window_size(glong * width, glong * height)
+{
+	*width = screen_width;
+	*height = screen_rows;
+}
+
+void console_vt_drain(struct console * vt)
+{
+	vt->current_pos = 0;
+
+	memset(vt->screen_buffer_glyph,0,screen_rows*screen_width*sizeof(gunichar));
+	memset(vt->screen_buffer_attr,0,screen_rows*screen_width*sizeof(guint64));
+
+	if(vt == console_get_forground_vt()){
+		utty_force_expose();
+	}
+}
+
 
 void console_vt_attach_reader(struct console * vt , struct io_request * request ) //
 {
@@ -254,7 +292,7 @@ void	console_vt_notify_keypress(struct console * vt,SDL_KeyboardEvent * key)
 	if(keycode == '\r')
 		keycode = vt->termios.c_iflag & ICRNL ? '\n':'\r';
 
-	if( keycode == '\b' && (lflag & ICANON|ECHOE) ) // line edit, erase one
+	if( keycode == '\b' && (lflag & (ICANON|ECHOE) ) ) // line edit, erase one
 	{
 		g_queue_pop_tail(& vt->keycode_buffer);
 
@@ -333,8 +371,6 @@ void	console_notify_keypress(SDL_KeyboardEvent * key)
 		default:
 			break;
 	}
-	if(key->keysym.sym)
-
 	if(notify)
 		console_vt_notify_keypress(vt,key);
 }

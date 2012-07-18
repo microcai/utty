@@ -10,8 +10,8 @@
 #include <fuse.h>
 #include <termio.h>
 #include <errno.h>
+#include <linux/kd.h>
 
-#include "kernel.h"
 #include "utty.h"
 #include <console.h>
 
@@ -29,6 +29,16 @@ const char * cmdname( int cmd)
 			return "TIOCGSID";
 		case TIOCGPGRP:
 			return "TIOCGPGRP";
+		case TIOCSPGRP:
+			return "TIOCSPGRP";
+		case KDGKBMODE:
+			return "KDGKBMODE";
+		case KDGKBLED:
+			return "KDGKBLED";
+		case TCSETS:
+			return "TCSETS";
+		case TIOCGWINSZ:
+			return "TIOCGWINSZ";
 		default:
 			break;
 	}
@@ -61,8 +71,9 @@ void tty_ioctl(fuse_req_t req, int cmd, void *arg,
 		break;
 
 	case TCSETSF:
-	case TCSETS:
+		console_vt_drain(vt);
 	case TCSETSW:
+	case TCSETS:
 		if (!in_bufsz)
 		{
 			struct iovec iov =
@@ -154,14 +165,29 @@ void tty_ioctl(fuse_req_t req, int cmd, void *arg,
 			fuse_reply_ioctl(req, 0, &size, sizeof(size));
 		}
 		break;
+	case KDGKBLED:
+		if (!out_bufsz)
+		{
+			struct iovec iov =
+			{ arg, sizeof(struct winsize) };
+			fuse_reply_ioctl_retry(req, NULL, 0, &iov, 1);
+		}
+		else
+		{
+			struct winsize size;
+			console_vt_get_window_size(vt,&size);
+			fuse_reply_ioctl(req, 0, &size, sizeof(size));
+		}
+		break;
 	case TIOCSWINSZ:
 	case TIOCMGET:
 		fuse_reply_err(req,EINVAL);
 		break;
 
 	default:
-		printf("handled cmd=0x%x (%s) . arg=%p as ENOSYS\n",cmd, cmdname(cmd) , arg);
+		printf("unhandled cmd=0x%x (%s) . arg=%p as ENOSYS\n",cmd, cmdname(cmd) , arg);
 		fuse_reply_err(req,ENOSYS);
 		return ;
 	}
+	printf("handled cmd=0x%x (%s) . arg=%p \n",cmd, cmdname(cmd),arg);
 }

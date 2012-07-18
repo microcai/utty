@@ -23,7 +23,6 @@
 #include FT_FREETYPE_H
 #include FT_GLYPH_H
 
-#include "kernel.h"
 #include "utty.h"
 #include "font.h"
 #include "console.h"
@@ -132,16 +131,15 @@ static void utty_init_video()
 
 static void utty_init()
 {
-	// load font
-	init_font();
-
 	/*
 	 * init display and keyborad.
 	 *
 	 * It will then call init_console() to build an console on top of it and mutiplex it as VT
 	 */
-
 	utty_init_video();
+
+	// load font
+	init_font();
 
 	//  create tty device , one thread per tty
 	init_vt();

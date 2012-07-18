@@ -12,12 +12,36 @@
 #include <glib.h>
 #include <SDL/SDL_events.h>
 
+#include "utty.h"
+
+struct color
+{
+	guchar red, green, blue;
+};
+
+struct _attribute
+{
+	struct color fg;
+	struct color bg;
+	guint16 attr;
+} attribute;
+
+union attribute
+{
+	struct _attribute s;
+	guint64 qword;
+};
+
+#define ATTR_BOLD		1
+#define	ATTR_ALANT	2
 
 struct console{
 	gunichar	* screen_buffer_glyph;
-	guint32	* screen_buffer_color;
+	guint64	* screen_buffer_attr; // 24bit for color, 8 bit for attrib
 	gint		current_pos;
 	gint		char_pixelsize; // char size in pixel, 8x16 font is 16
+
+	guint64	cur_attr; // current fg bg color, and attribute
 
 	GRecMutex		lock;
 	GQueue readers ;
@@ -45,6 +69,8 @@ struct console * console_direct_get_vt(int index);
 struct console  * console_get_forground_vt();
 void	 console_vt_get_termios(struct console * vt,struct termios *);
 void	 console_vt_set_termios(struct console * vt,struct termios *);
+void	 console_get_window_size(glong * width, glong * height);
+void	 console_vt_drain(struct console * vt);
 
 /*Called by UI code, not by CUSE code*/
 void console_draw_vt( struct console * vt ,SDL_Surface * screen);

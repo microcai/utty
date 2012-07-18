@@ -13,6 +13,6 @@
 
 void init_font();
 
-SDL_Surface * font_render_unicode(gunichar uc,int pixelsize);
+SDL_Surface * font_render_unicode(gunichar uc,int pixelsize,guint64 attribute);
 
 #endif /* FONT_H_ */

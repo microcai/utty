@@ -5,108 +5,62 @@
  *      Author: cai
  */
 
-#include <ft2build.h>
-#include <fontconfig/fontconfig.h>
-#include <fontconfig/fcfreetype.h>
-#include <poll.h>
-#include FT_FREETYPE_H
-#include FT_GLYPH_H
+#include <cairo/cairo.h>
+#include <SDL/SDL_video.h>
 
+#include "console.h"
 #include "font.h"
-
 
 static int sdldeeps[] =
 { 32, 1, 8, 2, 4, 8, 8 };
 
-static FT_Library ftlib;
-
-static char * ttffile;
-
-static void loadfont()
-{
-	int ret;
-
-	FcPattern * fcpat =  FcPatternCreate();
-	FcConfigSubstitute(0,fcpat,FcMatchPattern);
-
-	FcDefaultSubstitute(fcpat);
-
-	ret = FcPatternAddString(fcpat,FC_FAMILY,"Monospace");
-
-	FcFontSet * fcfs = FcFontSetCreate ();
-
-	FcResult result;
-	FcFontSetAdd(fcfs,FcFontMatch(0,fcpat,&result));
-	FcPatternDestroy(fcpat);
-
-	FcFontSetPrint(fcfs);
-
-	FcPattern * matchedpattern = FcFontSetMatch(0,&fcfs,1,fcpat,&result);
-
-	FcChar8 * ttf;
-
-	ret = FcPatternGetString(matchedpattern,FC_FILE,0,&ttf);
-
-	ttffile = g_strdup(ttf);
-
-	FcPatternDestroy(matchedpattern);
-
-}
-
-
 void init_font()
 {
+	glong width,height;
 
-	FT_Init_FreeType(&ftlib);
+	console_get_window_size(&width,&height);
 
-	/*don't enable HOME sice we are runing as system instance*/
-	FcConfigEnableHome(FALSE);
-	FcInit();
-
-	loadfont();
 }
 
-
-/*
- * TODO
- *  load font file for the given char , and also ,respect to the locale setting
- *
- */
-FT_Face matchbest(gunichar uc)
+SDL_Surface * font_render_unicode(gunichar uc,int pixelsize,guint64 attribute)
 {
-	static FT_Face ret;
+	char buf[6]={0};
 
-	if(!ret){
+	guchar attr;
 
-		FT_New_Face(ftlib,ttffile,0,&ret);
+	union attribute a ;
 
-	}
+	a.qword = attribute;
+	attr = a.s.attr;
 
+	g_unichar_to_utf8(uc,buf);
 
-	// cache the last time used FT_face
+	cairo_surface_t *cairo_surface =  cairo_image_surface_create(CAIRO_FORMAT_RGB24,pixelsize,pixelsize);
 
+	cairo_t *cairo = cairo_create(cairo_surface);
 
+	cairo_set_source_rgb(cairo,a.s.bg.red,a.s.bg.green,a.s.bg.blue);
 
+	cairo_fill(cairo);
 
-	return ret;
-}
+	cairo_set_source_rgb(cairo,a.s.fg.red,a.s.fg.green,a.s.fg.blue);
 
-/*
- * TODO: place the font on baseline
- */
-SDL_Surface * font_render_unicode(gunichar uc, int pixelsize)
-{
-	FT_Face ftface = matchbest(uc);
+	cairo_select_font_face(cairo,"Monospace",attr & ATTR_ALANT, attr & ATTR_BOLD);
 
-	FT_Set_Pixel_Sizes(ftface,0,pixelsize);
+	cairo_set_font_size(cairo,pixelsize);
 
+	cairo_move_to(cairo,0,pixelsize*0.8);
 
-	FT_Load_Char(ftface, uc, FT_LOAD_RENDER | FT_LOAD_TARGET_NORMAL);
+	cairo_show_text(cairo,buf);
 
-	FT_Bitmap bmp = ftface->glyph->bitmap;
+	cairo_surface_flush(cairo_surface);
 
-	SDL_Surface * surface = SDL_CreateRGBSurfaceFrom(bmp.buffer, bmp.width,
-			bmp.rows, sdldeeps[bmp.pixel_mode], bmp.pitch, 0xff, 0xff, 0xff, 0);
+	void * buffer = cairo_image_surface_get_data(cairo_surface);
+	int		pixwidth = cairo_image_surface_get_width(cairo_surface);
+	int		pixrows = cairo_image_surface_get_height(cairo_surface);
+	int		pitch = cairo_image_surface_get_stride(cairo_surface);
+
+	SDL_Surface * surface = SDL_CreateRGBSurfaceFrom(buffer, pixwidth,pixrows,32, pitch, 0xff0000, 0xff00, 0xff, 0);
 
 	return surface;
 }
