@@ -179,11 +179,10 @@ void tty_ioctl(fuse_req_t req, int cmd, void *arg,
 			fuse_reply_ioctl(req, 0, &size, sizeof(size));
 		}
 		break;
-	case TIOCSWINSZ:
 	case TIOCMGET:
 		fuse_reply_err(req,EINVAL);
 		break;
-
+	case TIOCSWINSZ://not allowed to resize, its fixed as KMS!
 	default:
 		printf("unhandled cmd=0x%x (%s) . arg=%p as ENOSYS\n",cmd, cmdname(cmd) , arg);
 		fuse_reply_err(req,ENOSYS);
