@@ -67,6 +67,11 @@ void init_font()
 }
 
 
+/*
+ * TODO
+ *  load font file for the given char , and also ,respect to the locale setting
+ *
+ */
 FT_Face matchbest(gunichar uc)
 {
 	static FT_Face ret;
@@ -86,7 +91,9 @@ FT_Face matchbest(gunichar uc)
 	return ret;
 }
 
-
+/*
+ * TODO: place the font on baseline
+ */
 SDL_Surface * font_render_unicode(gunichar uc, int pixelsize)
 {
 	FT_Face ftface = matchbest(uc);
