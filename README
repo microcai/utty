@@ -25,5 +25,8 @@ to use pty, agetty must be child of PID 1, PID 1 must be responsible to draw to 
 To be able to be future Wayland client of a system compositor. SDL will have Wayland backend.
 Also we can debug under X :)
 
+3: A demo Video?
+Sure http://v.youku.com/v_show/id_XNDI5MDIwOTQ4.html
+We chinese people are not allowed to access GOOGLE service. :( . So no youtube video.
 
 
