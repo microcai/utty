@@ -14,55 +14,20 @@
 
 #include "utty.h"
 
-struct color
-{
-	guchar red, green, blue;
-};
 
-struct _attribute
-{
-	struct color fg;
-	struct color bg;
-	guint16 attr;
-} attribute;
-
-union attribute
-{
-	struct _attribute s;
-	guint64 qword;
-};
-
-#define ATTR_BOLD		1
-#define	ATTR_ALANT	2
-
-struct console{
-	gunichar	* screen_buffer_glyph;
-	guint64	* screen_buffer_attr; // 24bit for color, 8 bit for attrib
-	gint		current_pos;
-	gint		char_pixelsize; // char size in pixel, 8x16 font is 16
-
-	guint64	cur_attr; // current fg bg color, and attribute
-
-	GRecMutex		lock;
-	GQueue readers ;
-
-	GQueue keycode_buffer;
-
-	pid_t control_pid;
-
-	pid_t session_id;
-
-	struct termios termios;
-
-	/*
-	 * flags for DECODE ESCAPE SEQUENCE
-	 */
-
-
-	guint64	flags_esc:1;
-	guint64	flags_csi:1;
+/*
+ * struct for console screen write
+ *
+ * consw is a device for output
+ */
+struct consw{
+	void (*sw_redraw)();
+	void (*sw_setfgcolor)();
+	void (*sw_setbgcolor)();
+	void (*sw_putc)();
 
 };
+
 
 void init_console(int width,int height, int char_widh_pixel);
 struct console * console_direct_get_vt(int index);
@@ -82,10 +47,5 @@ void DBG_console_vt_printbuffer(struct console * vt);
 #else
 #define DBG_console_vt_printbuffer(x)  do{;}while(0)
 #endif
-
-/**Called by CUSE code, not by UI code*/
-void console_vt_notify_write(struct console * vt, gunichar chars[], glong count);
-void console_vt_attach_reader(struct console * vt , struct io_request * request );
-void console_vt_get_window_size(struct console * vt ,struct winsize*);
 
 #endif /* CONSOLE_H_ */

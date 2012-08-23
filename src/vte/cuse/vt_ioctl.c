@@ -12,8 +12,8 @@
 #include <errno.h>
 #include <linux/kd.h>
 
-#include "utty.h"
-#include <console.h>
+#include "../utty.h"
+#include "vt.h"
 
 const char * cmdname( int cmd)
 {
@@ -39,6 +39,8 @@ const char * cmdname( int cmd)
 			return "TCSETS";
 		case TIOCGWINSZ:
 			return "TIOCGWINSZ";
+		case TIOCSWINSZ:
+			return "TIOCSWINSZ";
 		default:
 			break;
 	}
@@ -71,7 +73,6 @@ void tty_ioctl(fuse_req_t req, int cmd, void *arg,
 		break;
 
 	case TCSETSF:
-		console_vt_drain(vt);
 	case TCSETSW:
 	case TCSETS:
 		if (!in_bufsz)
@@ -161,7 +162,7 @@ void tty_ioctl(fuse_req_t req, int cmd, void *arg,
 		else
 		{
 			struct winsize size;
-			console_vt_get_window_size(vt,&size);
+			vte_get_window_size(vt,&size);
 			fuse_reply_ioctl(req, 0, &size, sizeof(size));
 		}
 		break;
@@ -175,7 +176,7 @@ void tty_ioctl(fuse_req_t req, int cmd, void *arg,
 		else
 		{
 			struct winsize size;
-			console_vt_get_window_size(vt,&size);
+			vte_get_window_size(vt,&size);
 			fuse_reply_ioctl(req, 0, &size, sizeof(size));
 		}
 		break;

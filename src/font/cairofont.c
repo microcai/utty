@@ -5,10 +5,12 @@
  *      Author: cai
  */
 
+#define _FILE_OFFSET_BITS 64
+
 #include <cairo/cairo.h>
 #include <SDL/SDL_video.h>
 
-#include "console.h"
+#include "../console.h"
 #include "font.h"
 
 static int sdldeeps[] =

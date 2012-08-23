@@ -1,10 +1,10 @@
+SUBDIRS = font console vte
+
 bin_PROGRAMS=utty
-utty_SOURCES=utty.c utty.h\
-				font.c font.h\
-				console.c console.h\
-				vt.c vt.h vt_ioctl.c 
+utty_SOURCES=main.c
+				
+LIBS+=@FUSE_LIBS@ @GLIB_LIBS@
 
-AM_CPPFLAGS=@FUSE_CFLAGS@ @GLIB_CFLAGS@ @FONTS_CFLAGS@
+utty_LDADD=font/libfont.a console/libconsole.a  vte/libvte.a
 
-LIBS+=@FUSE_LIBS@ @GLIB_LIBS@ @FONTS_LIBS@
-
+utty_DEPENDENCIES=$(utty_LDADD)

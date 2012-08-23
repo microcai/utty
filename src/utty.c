@@ -24,9 +24,9 @@
 #include FT_GLYPH_H
 
 #include "utty.h"
-#include "font.h"
+#include "font/font.h"
+#include "vte/vt.h"
 #include "console.h"
-#include "vt.h"
 
 static void utty_redraw()
 {
@@ -177,7 +177,7 @@ void utty_force_expose()
 	SDL_PushEvent(&event);
 }
 
-int main(int argc, char **argv)
+int __main(int argc, char **argv)
 {
 	// init things
 	utty_init(argc,argv);
