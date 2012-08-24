@@ -6,6 +6,7 @@
 #include "font/font.h"
 #include "vte/vte.h"
 #include "vte/utf8.h"
+#include "tty/tty.h"
 
 enum vte_color {
 	COLOR_BLACK,
@@ -231,4 +232,10 @@ struct vte * vte_new()
 		vte->clear = vte_clear;
 	}
 	return vte;
+}
+
+void vte_bint_tty(struct vte * vte, struct tty * tty)
+{
+	vte->tty = tty;
+	tty->vte = vte;
 }

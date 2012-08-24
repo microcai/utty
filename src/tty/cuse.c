@@ -1,4 +1,5 @@
 #include <stdio.h>
+#include <stdlib.h>
 #include <fuse/cuse_lowlevel.h>
 #include <fuse/fuse_common.h>
 #include <fuse/fuse.h>
@@ -8,9 +9,10 @@
 #include <linux/kd.h>
 
 #include "vte/vte.h"
+#include "tty/tty.h"
 
-#define _fi_vte(fi) (fi->fh)
-#define fi_vte(fi)	((struct vte*)_fi_vte(fi))
+#define _fi_tty(fi) (fi->fh)
+#define fi_tty(fi)	((struct tty*)_fi_tty(fi))
 
 #include "cuseioctl.c.h"
 
@@ -24,7 +26,7 @@ static void tty_poll(fuse_req_t req, struct fuse_file_info *fi,struct fuse_pollh
 
 static void tty_open(fuse_req_t req, struct fuse_file_info *fi)
 {
-	_fi_vte(fi) = (uint64_t)fuse_req_userdata(req);
+	_fi_tty(fi) = (uint64_t)fuse_req_userdata(req);
 	fuse_reply_open(req, fi);
 }
 
@@ -39,12 +41,12 @@ static void tty_write(fuse_req_t req, const char *buf, size_t size,
 {
 	struct chunk chunk;
 
-	chunk.vte = fi_vte(fi);
+	chunk.tty = fi_tty(fi);
 
 	chunk.size = size;
 	chunk.data = buf;
 
-	fi_vte(fi)->feed(fi_vte(fi),&chunk);
+	fi_tty(fi)->vte->feed(fi_tty(fi)->vte,&chunk);
 
 	fuse_reply_write(req,size);
 }
@@ -61,9 +63,9 @@ static void tty_release(fuse_req_t req, struct fuse_file_info *fi)
 
 static void * cuse_loop(void * threadparam)
 {
-	struct vte * vte = threadparam;
+	struct tty * tty = threadparam;
 
-	struct fuse_session * fuse = vte->private;
+	struct fuse_session * fuse = tty->private;
 
 	fuse_session_loop(fuse);
 
@@ -79,18 +81,15 @@ static const struct cuse_lowlevel_ops tty_clop = {
 	.poll		= tty_poll,
 };
 
-struct vte * vte_cuse_new()
+
+struct tty * tty_cuse_new()
 {
 	static int device_index = 0;
 
 	char devname[24]={0};
 	struct fuse_args args={0};
 
-
-	struct vte * vte = vte_new();
-
-	// Override functions
-
+	struct tty * tty =  calloc(1,sizeof(struct tty));
 	// setup cuse
 
 	snprintf(devname,sizeof devname,"DEVNAME=utty%d",device_index++);
@@ -107,10 +106,10 @@ struct vte * vte_cuse_new()
 
 	int no=1;
 
-	struct fuse_session * session = cuse_lowlevel_setup(args.argc,args.argv, &ci, &tty_clop, &no,vte);
+	struct fuse_session * session = cuse_lowlevel_setup(args.argc,args.argv, &ci, &tty_clop, &no,tty);
 
-	vte->private = session;
+	tty->private = session;
 
-	pthread_create(&vte->thread,NULL,cuse_loop,vte);
-	return vte;
+	pthread_create(&tty->thread,NULL,cuse_loop,tty);
+	return tty;
 }

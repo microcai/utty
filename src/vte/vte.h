@@ -7,12 +7,8 @@
 
 struct input_event;
 struct console;
-
-struct chunk {
-	struct vte* vte;
-	size_t	size;
-	const void	*data;
-};
+struct tty;
+struct chunk;
 
 struct vte{
 	pthread_mutex_t	 lock;
@@ -20,6 +16,8 @@ struct vte{
 	struct vte * next ; // next VTE
 
 	struct console * con; // upper layer console
+
+	struct tty * tty;
 
 	/* called by console layer, notify the VTE that user press a key*/
 	void (*process_key)(struct vte*,struct input_event*);
@@ -47,10 +45,7 @@ struct vte{
 	/* clear screen */
 	void (*clear)(struct vte*);
 
-	/* the thread that do IO operate CUSE or PTY*/
-	pthread_t thread;
 	void *private;
-
 
 	struct termios termios;
 
@@ -61,4 +56,4 @@ struct vte{
 
 
 struct vte * vte_new()__attribute__((visibility("hidden")));
-struct vte * vte_cuse_new()__attribute__((visibility("hidden")));
+void vte_bint_tty(struct vte * vte, struct tty * tty);
