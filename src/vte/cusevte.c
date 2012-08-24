@@ -4,7 +4,9 @@
 #include <fuse/fuse.h>
 #include <pthread.h>
 #include <termio.h>
+#include <errno.h>
 #include <linux/kd.h>
+
 #include "vte/vte.h"
 
 #define _fi_vte(fi) (fi->fh)

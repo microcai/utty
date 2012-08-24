@@ -1,6 +1,7 @@
 #pragma  once
 
 #include <pthread.h>
+#include <termio.h>
 
 #include <common.h>
 
@@ -49,6 +50,9 @@ struct vte{
 	/* the thread that do IO operate CUSE or PTY*/
 	pthread_t thread;
 	void *private;
+
+
+	struct termios termios;
 
 };
 
